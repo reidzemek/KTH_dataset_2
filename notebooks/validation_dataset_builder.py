@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.19.11"
+__generated_with = "0.20.2"
 app = marimo.App()
 
 
@@ -22,9 +22,26 @@ def _():
     import json
     import shutil
     import numpy as np
-    import yaml
+    from collections import defaultdict
+    from ruamel.yaml import YAML
+    from ruamel.yaml.comments import CommentedMap, CommentedSeq
+    from rich.progress import track
 
-    return Encoding, Path, PointCloud, json, mo, np, os, sys, yaml
+    return (
+        CommentedMap,
+        CommentedSeq,
+        Encoding,
+        Path,
+        PointCloud,
+        YAML,
+        defaultdict,
+        json,
+        mo,
+        np,
+        os,
+        sys,
+        track,
+    )
 
 
 @app.cell
@@ -117,28 +134,12 @@ def _(
 
 
 @app.cell
-def _():
-    import time
-    from collections import defaultdict
-    from ruamel.yaml import YAML
-    from ruamel.yaml import CommentedMap, CommentedSeq
-    from ruamel.yaml.tokens import CommentToken
-    from ruamel.yaml.scalarstring import PlainScalarString
-
-    return CommentedMap, CommentedSeq, YAML, defaultdict
-
-
-@app.cell
-def _(yaml):
-    # 1. DEFINE ALIGNMENT LOGIC
-    # This ensures all floats are written with 15 decimal places and aligned 
-    def aligned_float_representer(dumper, data):
-        # 22.15f: 22 total width, 15 decimals. 
-        # High width ensures even large translation values don't break the alignment.
-        return dumper.represent_scalar('tag:yaml.org,02:float', f"{data:22.15f}")
-
-    yaml.add_representer(float, aligned_float_representer)
-    return
+def _(YAML):
+    yaml_width = 100
+    yaml = YAML()
+    yaml.default_flow_style = False
+    yaml.width = yaml_width
+    return yaml, yaml_width
 
 
 @app.cell
@@ -151,7 +152,6 @@ def _(
     PointCloud,
     SOURCE_POINT_COUNT,
     VALIDATION_DATASET_PATH,
-    YAML,
     defaultdict,
     icp,
     json,
@@ -159,7 +159,10 @@ def _(
     mo,
     np,
     os,
+    track,
     utilities,
+    yaml,
+    yaml_width,
 ):
     # List the scan directories in the provided dataset path
     from docutils.nodes import meta
@@ -168,7 +171,7 @@ def _(
     # Initialize the scan progress bar UI
     with mo.status.progress_bar(total=len(scan_dirs), title="Currently processing scan") as scan_progress:
 
-        for scan_dir in scan_dirs:
+        for scan_dir in track(scan_dirs, description="Processing scans: "):
 
             # Update the scan progress bar UI
             scan_progress.update(increment=0, subtitle=f"{scan_dir.name}")
@@ -181,34 +184,29 @@ def _(
             # Initialize the frame progress bar UI
             with mo.status.progress_bar(total=len(frame_map), title="Currently processing frame", remove_on_exit=True) as frame_progress:
 
-                for prefix in sorted(frame_map.keys()):
+                for prefix in track(sorted(frame_map.keys()), description="Professing frames: "):
 
                     # Update the frame progress bar UI
                     frame_progress.update(increment=0, subtitle=f"{prefix}")
 
-                    # Extract point cloud and metadata file paths
+                    # Extract point cloud, metadata and amplitude file paths
                     files = frame_map[prefix]
                     source_path = next(f for f in files if f.name.endswith("_filtered_full_pointcloud.pcd"))
                     metadata_path = next(f for f in files if f.name.endswith("_metadata.json"))
+                    amplitude_path = next(f for f in files if f.name.endswith("_amplitude.json"))
+
+                    # Initialize the path for the validation dataset
+                    validation_path = os.path.join(VALIDATION_DATASET_PATH, scan_dir.name, prefix)
+                    Path(validation_path).mkdir(parents=True, exist_ok=True)
 
                     # Read, downsample and add source point cloud to the validation dataset
                     P = PointCloud.from_path(source_path).numpy(('x', 'y', 'z'))
-                    P_d = utilities.farthest_point_sampling(P, SOURCE_POINT_COUNT)
-                    validation_path = os.path.join(VALIDATION_DATASET_PATH, scan_dir.name, prefix)
-                    Path(validation_path).mkdir(parents=True, exist_ok=True)
-                    PointCloud.from_xyz_points(P_d).save(os.path.join(validation_path, "source.pcd"), encoding=Encoding.ASCII)
+                    P_ds = utilities.farthest_point_sampling(P, SOURCE_POINT_COUNT)
+                    PointCloud.from_xyz_points(P_ds).save(os.path.join(validation_path, source_path.name), encoding=Encoding.ASCII)
 
-                    # Prepare validation dataset metadata file
-                    metadata_yaml = YAML()
-                    metadata_yaml.width = 512
-                    metadata_yaml.indent(mapping=2, sequence=4, offset=2)
-                    metadata_validation = CommentedMap()
-
-                    # Add the current source path to the validation metadata
-                    metadata_validation["source"] = str(source_path)
-
-                    # List to hold validation metadata for filtered targets 
-                    filtered_targets_validation = []
+                    # Read the point cloud amplitude data
+                    with open(amplitude_path, 'r') as file:
+                        amplitude = np.array(json.load(file)["data"])
 
                     # Load the metadata file for the current source point cloud
                     with open(metadata_path, 'r') as file:
@@ -216,20 +214,31 @@ def _(
 
                     filtered_targets = metadata.get("filtered_targets")
 
+                    # Initialize structured validation metadata for YAML
+                    metadata_validation = {}
+
+                    # Add the current source path to the validation metadata
+                    metadata_validation["source"] = os.path.join(validation_path, source_path.name)
+
+                    # List to hold validation metadata for filtered targets 
+                    filtered_targets_validation = []
+
                     # Initialize the target progress bar UI
                     with mo.status.progress_bar(total=len(filtered_targets), title="Currently processing target", remove_on_exit=True) as target_progress:
 
-                        for target in filtered_targets:
+                        for target in track(filtered_targets, description="Professing targets: "):
 
                             # Update the target progress bar UI
                             target_progress.update(increment=0, subtitle=f"{target.get("bolt")} - {target.get("id")} (Bolt - ID)")
 
                             # Read the transformation matrix and the corresponding point to plate transformation error from the metadata file
                             T_matrix = np.array(target.get("transformation_matrix"), dtype=float).T
-                            T_error = target.get("transformation_error")
+                            T_error = np.array(target.get("transformation_error"))
 
                             # Target path
-                            target_path = os.path.join(DATASET_PATH, "targets", str(target.get("bolt")), str(target.get("id")) + ".pcd")
+                            target_path = Path(os.path.join(DATASET_PATH, "targets", str(target.get("bolt")), str(target.get("id")) + ".pcd"))
+
+                            print(f"\nSource: {source_path}\nTarget: {target_path}")
 
                             # Load the target point cloud
                             Q = PointCloud.from_path(target_path).numpy(('x', 'y', 'z'))
@@ -241,44 +250,58 @@ def _(
                             T_error_p2p = icp.p2p_error(P, Q_nearest)
                             T_error_p2pl = icp.p2pl_error(P, Q_nearest, N_nearest)
 
-                            target_validation = CommentedMap()
-                            target_validation["path"] = str(target_path)
-                            matrix_rows = CommentedSeq()
+                            # Structured validation metadata for current target
+                            target_validation = CommentedMap({
+                                "path": os.path.join(validation_path, target_path.name),
+                                "transformation_matrix": [
+                                    (lambda r: r.fa.set_flow_style() or r)(
+                                        CommentedSeq(row)
+                                    ) for row in T_matrix.tolist()
+                                ],
+                                "metrics": {
+                                    "original": {
+                                        "transformation_error": float(T_error)
+                                    },
+                                    "computed": {
+                                        "transformation_error_p2p": float(T_error_p2p),
+                                        "transformation_error_p2pl": float(T_error_p2pl)
+                                    }
+                                }       
+                            })
+
+                            T_matrix_visual = "Visual Representation:\n"
                             for row in T_matrix:
-                                # Convert row to a CommentedSeq to access formatting attributes
-                                row_seq = CommentedSeq([float(val) for val in row])
+                                T_matrix_visual += f"[ {', '.join(f'{val:8.3f}' for val in row)} ]\n"
 
-                                # Set the flow style for this specific row (square brackets)
-                                row_seq.fa.set_flow_style() 
+                            target_validation.yaml_set_comment_before_after_key('metrics', before=T_matrix_visual, indent=2)
 
-                                matrix_rows.append(row_seq)
-
-                            target_validation["transformation_matrix"] = matrix_rows
-
-                            target_validation["metrics"] = {
-                                "original": {
-                                    "transformation_error": T_error
-                                },
-                                "computed": {
-                                    "transformation_error_p2p": float(T_error_p2p),
-                                    "transformation_error_p2pl": float(T_error_p2pl)
-                                }
-                            }
                             filtered_targets_validation.append(target_validation)
 
                             target_progress.update()
 
-                    metadata_validation["targets"] = filtered_targets_validation
+                    filtered_targets_validation_formatted = CommentedSeq(filtered_targets_validation)
+                    for i in range(0, len(filtered_targets_validation_formatted)):
+                        label = f" TARGET {i+1} ".center(yaml_width - 4, "#")
+                        filtered_targets_validation_formatted.yaml_set_comment_before_after_key(i, before=f"\n{label}", indent=2)
+                    
+                    metadata_validation["targets"] = filtered_targets_validation_formatted
                     metadata_validation["criterion"] = {
                         "metric": "metrics.original.transformation_error",
                         "objective": "minimize"
                     }
+
+                    metadata_validation_formatted = CommentedMap(metadata_validation)
+                    for key in list(metadata_validation_formatted.keys())[1:]:
+                        metadata_validation_formatted.yaml_set_comment_before_after_key(key, before="\n")
+
+                    metadata_validation_formatted.yaml_set_comment_before_after_key("targets", before="Target point clouds identified as potential matches")
+                    metadata_validation_formatted.yaml_set_comment_before_after_key("criterion", before="Best target selection criterion")
+                 
                     with open(os.path.join(validation_path, "metadata.yaml"), "w") as f:
-                        metadata_yaml.dump(metadata_validation, f)
+                        yaml.dump(metadata_validation_formatted, f)
 
                     frame_progress.update()
             scan_progress.update()
-
 
 
 
