@@ -5,13 +5,18 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "debugpy>=1.8.20",
+    "glom>=25.12.0",
     "marimo>=0.20.2",
     "matplotlib>=3.10.8",
+    "natsort>=8.4.0",
     "numpy>=2.4.2",
     "pathlib>=1.0.1",
+    "plotly>=6.6.0",
     "pypcd4>=1.4.3",
     "pyzmq>=27.1.0",
     "rich>=14.3.3",
     "ruamel-yaml>=0.19.1",
+    "scipy>=1.17.1",
     "seaborn>=0.13.2",
 ]

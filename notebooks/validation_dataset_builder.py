@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.20.2"
+__generated_with = "0.20.4"
 app = marimo.App()
 
 
@@ -52,7 +52,7 @@ def _(Path, sys):
         Path().resolve().parent.parent / "icp-python"
     ]
 
-    # Add to path of not already there
+    # Add to path if not already there
     for _path in src_paths:
         if str(_path) not in sys.path:
             sys.path.insert(0, str(_path))
@@ -66,7 +66,7 @@ def _():
     import kdtree
     import icp
 
-    return icp, kdtree, utilities
+    return (utilities,)
 
 
 @app.cell
@@ -134,15 +134,6 @@ def _(
 
 
 @app.cell
-def _(YAML):
-    yaml_width = 100
-    yaml = YAML()
-    yaml.default_flow_style = False
-    yaml.width = yaml_width
-    return yaml, yaml_width
-
-
-@app.cell
 def _(
     CommentedMap,
     CommentedSeq,
@@ -152,20 +143,22 @@ def _(
     PointCloud,
     SOURCE_POINT_COUNT,
     VALIDATION_DATASET_PATH,
+    YAML,
     defaultdict,
-    icp,
     json,
-    kdtree,
     mo,
     np,
     os,
     track,
     utilities,
-    yaml,
-    yaml_width,
 ):
+    # Configure yaml parameters
+    yaml_width = 100
+    yaml = YAML()
+    yaml.default_flow_style = False
+    yaml.width = yaml_width
+
     # List the scan directories in the provided dataset path
-    from docutils.nodes import meta
     scan_dirs = [d for d in Path(DATASET_PATH).glob("source_*") if d.is_dir()]
 
     # Initialize the scan progress bar UI
@@ -202,7 +195,7 @@ def _(
                     # Read, downsample and add source point cloud to the validation dataset
                     P = PointCloud.from_path(source_path).numpy(('x', 'y', 'z'))
                     P_ds = utilities.farthest_point_sampling(P, SOURCE_POINT_COUNT)
-                    PointCloud.from_xyz_points(P_ds).save(os.path.join(validation_path, source_path.name), encoding=Encoding.ASCII)
+                    PointCloud.from_xyz_points(P).save(os.path.join(validation_path, source_path.name), encoding=Encoding.ASCII)
 
                     # Read the point cloud amplitude data
                     with open(amplitude_path, 'r') as file:
@@ -245,18 +238,22 @@ def _(
                             N = PointCloud.from_path(target_path).numpy(('normal_x', 'normal_y', 'normal_z'))
 
                             # Compute the point to point and point to plane transformation errors
-                            Q_tree = kdtree.build(Q, N)
-                            Q_nearest, N_nearest = kdtree.nn_search(Q_tree, P)
-                            T_error_p2p = icp.p2p_error(P, Q_nearest)
-                            T_error_p2pl = icp.p2pl_error(P, Q_nearest, N_nearest)
+                            # Q_tree = kdtree.build(Q, N)
+                            # Q_nearest, N_nearest = kdtree.nn_search(Q_tree, P)
+                            T_error_p2p = 0#icp.p2p_error(P, Q_nearest)
+                            T_error_p2pl = 0#icp.p2pl_error(P, Q_nearest, N_nearest)
+
+                            # Ensure all numbers are native Python floats
+                            T_matrix_list = T_matrix.tolist()
+                            T_matrix_native = [[float(v) for v in row] for row in T_matrix_list]
 
                             # Structured validation metadata for current target
                             target_validation = CommentedMap({
-                                "path": os.path.join(validation_path, target_path.name),
+                                "path": str(Path(*target_path.parts[-3:])),
                                 "transformation_matrix": [
                                     (lambda r: r.fa.set_flow_style() or r)(
                                         CommentedSeq(row)
-                                    ) for row in T_matrix.tolist()
+                                    ) for row in T_matrix_native
                                 ],
                                 "metrics": {
                                     "original": {
@@ -283,7 +280,7 @@ def _(
                     for i in range(0, len(filtered_targets_validation_formatted)):
                         label = f" TARGET {i+1} ".center(yaml_width - 4, "#")
                         filtered_targets_validation_formatted.yaml_set_comment_before_after_key(i, before=f"\n{label}", indent=2)
-                    
+
                     metadata_validation["targets"] = filtered_targets_validation_formatted
                     metadata_validation["criterion"] = {
                         "metric": "metrics.original.transformation_error",
@@ -296,20 +293,12 @@ def _(
 
                     metadata_validation_formatted.yaml_set_comment_before_after_key("targets", before="Target point clouds identified as potential matches")
                     metadata_validation_formatted.yaml_set_comment_before_after_key("criterion", before="Best target selection criterion")
-                 
+
                     with open(os.path.join(validation_path, "metadata.yaml"), "w") as f:
                         yaml.dump(metadata_validation_formatted, f)
 
                     frame_progress.update()
             scan_progress.update()
-
-
-
-
-            # for path in groups["01"]:
-            #     print(path)
-
-                            # time.sleep(0.1)
     return
 
 

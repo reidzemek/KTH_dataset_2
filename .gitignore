@@ -1,5 +1,6 @@
 # Python-generated files
 __pycache__/
+__marimo__
 *.py[oc]
 build/
 dist/
@@ -11,8 +12,9 @@ wheels/
 
 .vscode
 
-KTH_dataset_2*
-Validation_Data*
+KTH_dataset_*
+*Validation_Data*
+KDTree_Search_Trace
 
 *.drawio
 
@@ -23,3 +25,4 @@ uv.lock
 *.txt
 
 test*
+temp*
