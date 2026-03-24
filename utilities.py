@@ -63,7 +63,7 @@ def validate_path(path):
         return mo.md("❌ **Path not found**").style(white_space="nowrap"), exists
     return mo.md("✅"), exists
 
-# TODO: this function should be added to the an ICP class along with all other ICP functionality
+# TODO this function should be added to the an ICP class along with all other ICP functionality
 def load_pc(path: Path) -> np.ndarray:
     """
     Load a point cloud from a CSV file into an nx3 NumPy array.
@@ -204,7 +204,7 @@ def process(validation_path, trace_path, n_P, n_Q, n_pairs, n_coord_bits, addr_w
                 tree_path = Path(trace_path, f"{tree_subpath}-{n_Q}_{n_coord_bits}.csv")
 
                 # Load tree data structure for target point cloud (Q) if it already exists
-                if tree_path.exists():
+                if False:#tree_path.exists():
 
                     # Initialize the k-d tree data structure for the target point cloud (Q)
                     Q_tree = KDTree(tree_path)
@@ -225,8 +225,14 @@ def process(validation_path, trace_path, n_P, n_Q, n_pairs, n_coord_bits, addr_w
                     Q_tree.write_tree(tree_path)
                     Q_tree.write_tree_bin(tree_path.with_suffix(".bin"), n_coord_bits, addr_width)
                     
+                Q_scipy_tree = scipy_KDTree(Q)
+                _, indices = Q_scipy_tree.query(P)
+                Q_scipy_nearest = Q[indices]
+
                 # Find the nearest neighbor for each point in the source point cloud (P)
                 Q_nearest, _ = Q_tree.nn_search(P)
+
+                print(f"CORRECT: {np.array_equal(Q_nearest, Q_scipy_nearest)}")
 
                 print(f"\nmax tree depth: {Q_tree.max_depth}")
                 print(f"total number of visited nodes: {Q_tree._visited_count}")
