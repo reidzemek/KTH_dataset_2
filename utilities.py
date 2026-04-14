@@ -190,7 +190,7 @@ def process(validation_path, trace_path, n_P, n_Q, n_pairs, n_coord_bits, addr_w
 
             for target in metadata["targets"]:
                 if n_pairs is not None and pc_pair_count >= n_pairs:
-                    return Q_tree._log_leaf, Q_tree._log_best, Q_tree._log_branch, log
+                    return Q_tree._log_leaf, Q_tree._log_best, Q_tree._log_branch, log, log_result
                 pc_pair_count += 1
 
                 # Target point cloud
@@ -247,4 +247,4 @@ def process(validation_path, trace_path, n_P, n_Q, n_pairs, n_coord_bits, addr_w
                 write_pc_bin(Q_nearest.astype(np.int64), nearest_path.with_suffix(".bin"), n_coord_bits)
 
                 Q_tree.write_search_trace(target_trace_path, n_P, n_Q, n_coord_bits)
-                log = Q_tree.write_unified_search_trace(target_trace_path, n_P, n_Q, n_coord_bits)
+                log, log_result = Q_tree.write_unified_search_trace(target_trace_path, n_P, n_Q, n_coord_bits)

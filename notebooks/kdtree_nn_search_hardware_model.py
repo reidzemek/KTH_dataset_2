@@ -517,7 +517,7 @@ def _(
 ):
     mo.stop(not is_script and not run_button.value, mo.md("Please configure options and click 🏃‍♂️‍➡️ **Run** to continue.").callout(kind="warn"))
 
-    log_leaf, log_best, log_branch, log = utilities.process(
+    log_leaf, log_best, log_branch, log, log_result = utilities.process(
         validation_path_field.value,
         trace_path_field.value,
         n_P_field.value,
@@ -528,11 +528,11 @@ def _(
         stats_q_coords["minimum"],
         stats_q_coords["maximum"]
     )
-    return log, log_best, log_branch, log_leaf
+    return log, log_best, log_branch, log_leaf, log_result
 
 
 @app.cell
-def _(log, log_best, log_branch, log_leaf, mo, pd):
+def _(log, log_best, log_branch, log_leaf, log_result, mo, pd):
     # VALIDATION_DATASET_PATH = validation_path_field.value
 
     search_trace_heading = mo.md("## 🔍 Anlaysis: 🧭 k-d tree search trace")
@@ -586,8 +586,18 @@ def _(log, log_best, log_branch, log_leaf, mo, pd):
         branch_heading,
         branch_pivot,
         unified_log_heading,
-        log
+        log,
+        mo.md("### Nearest Neighbours"),
+        log_result
     ])
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+ 
+    """)
     return
 
 
