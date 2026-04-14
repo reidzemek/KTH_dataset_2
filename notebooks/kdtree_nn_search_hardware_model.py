@@ -1,6 +1,14 @@
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "marimo>=0.22.4",
+#     "pyzmq>=27.1.0",
+# ]
+# ///
+
 import marimo
 
-__generated_with = "0.20.4"
+__generated_with = "0.23.1"
 app = marimo.App(width="medium", css_file="")
 
 
@@ -509,7 +517,7 @@ def _(
 ):
     mo.stop(not is_script and not run_button.value, mo.md("Please configure options and click 🏃‍♂️‍➡️ **Run** to continue.").callout(kind="warn"))
 
-    log_leaf, log_best, log_branch = utilities.process(
+    log_leaf, log_best, log_branch, log = utilities.process(
         validation_path_field.value,
         trace_path_field.value,
         n_P_field.value,
@@ -520,11 +528,11 @@ def _(
         stats_q_coords["minimum"],
         stats_q_coords["maximum"]
     )
-    return log_best, log_branch, log_leaf
+    return log, log_best, log_branch, log_leaf
 
 
 @app.cell
-def _(log_best, log_branch, log_leaf, mo, pd):
+def _(log, log_best, log_branch, log_leaf, mo, pd):
     # VALIDATION_DATASET_PATH = validation_path_field.value
 
     search_trace_heading = mo.md("## 🔍 Anlaysis: 🧭 k-d tree search trace")
@@ -556,6 +564,19 @@ def _(log_best, log_branch, log_leaf, mo, pd):
 
     branch_heading = mo.md("### Branch nodes")
 
+    unified_log_heading = mo.md("### Unified log")
+    columns = [
+        "query_addr",
+        "query_x", "query_y", "query_z",
+        "trav_id",
+        "node_addr",
+        "node_x", "node_y", "node_z",
+        "node_type",
+        "point_dist",
+        "plane_dist"
+    ]
+    unified_log = pd.DataFrame(log, columns=columns)
+
     mo.vstack([
         search_trace_heading,
         leaf_heading,
@@ -563,8 +584,15 @@ def _(log_best, log_branch, log_leaf, mo, pd):
         best_heading,
         best_df,
         branch_heading,
-        branch_pivot
+        branch_pivot,
+        unified_log_heading,
+        log
     ])
+    return
+
+
+@app.cell
+def _():
     return
 
 
