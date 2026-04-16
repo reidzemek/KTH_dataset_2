@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.19.11"
+__generated_with = "0.23.1"
 app = marimo.App()
 
 
@@ -18,13 +18,14 @@ def _():
 
 @app.cell
 def _(sys):
-    sys.path.append("/home/reidzemek/icp-python")
+    sys.path.append("/Users/reidzemek/Developer/icp-python")
     sys.path
     return
 
 
 @app.cell
 def _():
+    # CELL test
     import utils
     import rc_themes
 
@@ -33,7 +34,7 @@ def _():
 
 @app.cell
 def _(rc_themes, sns, utils):
-    # Apply theme
+    # CELL Apply theme
     if utils.system_dark_mode():
         rc_theme = rc_themes.monokai_classic_rc
     else:

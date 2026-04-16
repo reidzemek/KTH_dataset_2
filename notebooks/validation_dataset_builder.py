@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.20.4"
+__generated_with = "0.21.1"
 app = marimo.App()
 
 
@@ -63,7 +63,7 @@ def _(Path, sys):
 def _():
     import utilities
     import utils
-    import kdtree
+    import kdtree_old
     import icp
 
     return (utilities,)
@@ -238,8 +238,8 @@ def _(
                             N = PointCloud.from_path(target_path).numpy(('normal_x', 'normal_y', 'normal_z'))
 
                             # Compute the point to point and point to plane transformation errors
-                            # Q_tree = kdtree.build(Q, N)
-                            # Q_nearest, N_nearest = kdtree.nn_search(Q_tree, P)
+                            # Q_tree = kdtree_old.build(Q, N)
+                            # Q_nearest, N_nearest = kdtree_old.nn_search(Q_tree, P)
                             T_error_p2p = 0#icp.p2p_error(P, Q_nearest)
                             T_error_p2pl = 0#icp.p2pl_error(P, Q_nearest, N_nearest)
 
